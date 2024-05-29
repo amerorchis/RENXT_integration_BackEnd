@@ -1,0 +1,14 @@
+.vercel
+BbApiConnector_Python
+DripConnector
+__pycache__
+private
+api/test.py
+unused
+environment.env
+test_names.py
+venv
+test.py
+.DS_Store
+modules
+api/response.js
