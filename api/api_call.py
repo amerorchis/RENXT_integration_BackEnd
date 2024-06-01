@@ -20,8 +20,11 @@ class API_Search:
         # Create a list to hold the threads
         threads = []
 
-        # Start a thread for each name in the list        
-        rate_limiter = RateLimiter(max_calls=10, period=1)
+        # How many calls per second can your account make
+        account_rate_limit_throttle = 10
+
+        # Start a thread for each name in the list
+        rate_limiter = RateLimiter(max_calls=account_rate_limit_throttle, period=1)
 
         for constit in self.constits:
             with rate_limiter:
