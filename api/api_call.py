@@ -8,24 +8,37 @@ except ModuleNotFoundError:
     from batch_post import BatchPost
     from constituent import Constituent
 
+import threading
+import time
+from ratelimiter import RateLimiter
+
 class API_Search:
-    def __init__(self, batch: BatchPost, bb_session):
+    """
+    Takes a BatchPost and searches each constituent, saving the results in the original object.
+    """
+    def __init__(self, batch: 'BatchPost', bb_session):
+        """
+        Initializes the API_Search instance with a BatchPost and a Blackbaud session.
+
+        batch (BatchPost): The batch of constituents to be processed.
+        bb_session: The session object for making API requests.
+        """
         self.constits = batch.constits
         self.bb_session = bb_session
-        self.emails = []
-        self.errors = []
-        self.bad_responses = []
+        self.lock = threading.Lock()  # Initialize a lock for thread-safe operations
 
     def api_calls(self):
-        # Create a list to hold the threads
-        threads = []
+        """
+        Initiates API calls to search for each constituent in the batch. Uses threading
+        to perform multiple calls concurrently while respecting rate limits.
+        """
+        threads = []  # List to hold the threads
 
-        # How many calls per second can your account make
+        # Define the rate limit for API calls
         account_rate_limit_throttle = 10
-
-        # Start a thread for each name in the list
         rate_limiter = RateLimiter(max_calls=account_rate_limit_throttle, period=1)
 
+        # Create and start a thread for each constituent in the batch
         for constit in self.constits:
             with rate_limiter:
                 thread = threading.Thread(target=self.search_constituent, args=(constit,))
@@ -37,35 +50,33 @@ class API_Search:
             thread.join()
 
     def search_constituent(self, constit: Constituent):
-        bb_session = self.bb_session
+        """
+        Searches for a specific constituent by making an API call. Updates the constituent
+        object with the email and status based on the API response.
 
-        id = constit.id
-        name = constit.name
-
+        constit (Constituent): The constituent to search for.
+        """
         while True:
-            r = bb_session.get(f'https://api.sky.blackbaud.com/constituent/v1/constituents/{id}')
-            # Process the response
+            # Make an API call to get constituent data
+            r = self.bb_session.get(f'https://api.sky.blackbaud.com/constituent/v1/constituents/{constit.id}')
+
             if r.status_code == 200:
-                email = r.json().get('email', None)
-                do_not_email = False # This will be default value if there is no address, allows us to distinguish consent and missing info
-                if email:
-                    do_not_email = email['do_not_email']
-                    email = email['address'].strip()
+                # If the response is successful, extract email data
+                email_data = r.json().get('email', None)
+                email = email_data['address'].strip() if email_data else None
+                do_not_email = email_data['do_not_email'] if email_data else False
 
-                for i in self.constits:
-                    if i.id == id:
-                        i.add_email(email, do_not_email)
-                        i.status('found' if email else 'missing')
-                        break
-
+                # Use a lock to ensure thread-safe update of the constituent object
+                with self.lock:
+                    constit.add_email(email, do_not_email)
+                    constit.status('found' if email else 'missing')
                 break
 
             elif r.status_code == 429:
-                # wait for the specified retry-after time
+                # If the rate limit is exceeded, wait for the specified retry-after time
                 time.sleep(int(r.headers["Retry-After"]))
             else:
-                i.status('error')
+                # For other errors, set the constituent status to 'error'
+                with self.lock:
+                    constit.status('error')
                 break
-
-    def return_data(self):
-        return self.emails, self.errors
