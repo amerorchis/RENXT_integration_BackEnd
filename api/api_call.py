@@ -43,13 +43,18 @@ class API_Search:
             r = bb_session.get(f'https://api.sky.blackbaud.com/constituent/v1/constituents/{id}')
             # Process the response
             if r.status_code == 200:
-                email = r.json()['email']['address'].strip()
-                do_not_email = r.json()['email']['do_not_email']
+                email = r.json().get('email', None)
+                do_not_email = False # This will be default value if there is no address, allows us to distinguish consent and missing info
+                if email:
+                    do_not_email = email['do_not_email']
+                    email = email['address'].strip()
+
                 for i in self.constits:
                     if i.id == id:
                         i.add_email(email, do_not_email)
-                        i.status('found')
+                        i.status('found' if email else 'missing')
                         break
+
                 break
 
             elif r.status_code == 429:
@@ -60,5 +65,4 @@ class API_Search:
                 break
 
     def return_data(self):
-        # print(self.emails, self.errors)
         return self.emails, self.errors

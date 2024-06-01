@@ -28,7 +28,7 @@ class BatchPost:
         success = [i for i in self.constits if i._status == 'success']
         tag_failed = [i for i in self.constits if i._status == 'tag failed']
         no_consent = [i for i in self.constits if i._status == 'no consent']
-        no_email = [i for i in self.constits if i._status == 'error']
+        no_email = [i for i in self.constits if i._status in ['missing', 'error']]
 
         errors = tag_failed or no_consent or no_email
 
@@ -56,10 +56,12 @@ class BatchPost:
     def gen_resp(self) -> dict:
         req_type = 'Tagging' if self.tag_state else 'Untagging'
         success = [i for i in self.constits if i._status == 'success']
-        email_success = [i.name for i in self.constits if i._status == 'success']
-        email_fail = [i.name for i in self.constits if i._status != 'success']
+        email_success = [i.name for i in self.constits if (i._status == 'success' and not i.do_not_email)]
+        email_fail = [i.name for i in self.constits if (i._status != 'success' and not i.do_not_email)]
+        email_no_consent = [i.name for i in self.constits if i.do_not_email]
+
         message = f"{req_type} Processed for {self.batch}. {len(success)} found."
-        return {'message': message, 'outcome': "Success!", 'success': email_success, 'fail': email_fail}
+        return {'message': message, 'outcome': "Success!", 'success': email_success, 'fail': email_fail, 'noConsent': email_no_consent}
 
     def __str__(self) -> str:
         string = ''

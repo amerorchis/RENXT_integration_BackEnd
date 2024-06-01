@@ -26,6 +26,9 @@ def drip(batch: BatchPost, test=False):
             constit.status('no consent')
             return
 
+        if constit._status == 'missing':
+            return
+
         url = f'https://api.getdrip.com/v2/{account_ID}/tags'
         payload= {
             "tags": [{ 
@@ -45,6 +48,9 @@ def drip(batch: BatchPost, test=False):
 
 
     def untag_email(constit: Constituent):
+        if constit._status == 'missing':
+            return
+        
         url = f"https://api.getdrip.com/v2/{account_ID}/subscribers/{constit.email}/tags/{tag}"
 
         response = requests.delete(url, headers=headers)

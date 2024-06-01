@@ -12,3 +12,4 @@ test.py
 .DS_Store
 modules
 api/response.js
+test_data.txt
